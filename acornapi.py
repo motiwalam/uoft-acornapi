@@ -1,7 +1,10 @@
 import ltpa
 import requests
+import json
 
-ACORN_API_URL = 'https://acorn.utoronto.ca/sws/'
+from functools import cached_property
+
+ACORN_API_URL = 'https://acorn.utoronto.ca/sws/rest'
 
 class ACORN:
     def __init__(self, utorid, password):
@@ -39,3 +42,44 @@ class ACORN:
 
     def __set_session_ltpa(self):
         self.session.cookies.set(ltpa.LTPA_COOKIE_NAME, self.ltpa_token, domain="acorn.utoronto.ca")
+
+    # ----- actual api stuff -----
+
+    def get_json(self, endpoint, params=None):
+        self.authorizeIfNeeded()
+        params = {} if params is None else params
+        return json.loads(self.session.get(f'{ACORN_API_URL}{endpoint}', params=params).text)
+
+    @cached_property
+    def eligible_registrations(self):
+        return self.get_json('/enrolment/eligible-registrations')
+    
+    @cached_property
+    def program_progress(self):
+        return self.get_json('/dashboard/programProgress')
+    
+    @cached_property
+    def student_no(self):
+        return self.program_progress['studentID']
+
+    def course_registration_info(self, course_code, section_code, course_session_code):
+        """
+        course_code: department, course number, credit weight, campus
+                     e.g MAT102H5, CSC463H1
+                     does NOT contain F/S at the end
+        section_code: F/S
+        course_session_code: YYYY(1/5/9) (e.g 20249, 20251)
+        """
+        return self.get_json(
+            '/enrolment/course/view',
+            # TODO: not too sure about the index 0 here
+            params=self.eligible_registrations[0]['registrationParams'] | {
+                'courseCode': course_code,
+                'courseSessionCode': course_session_code,
+                'sectionCode': section_code,
+            }
+        )
+
+    def recent_academic_history(self):
+        return self.get_json('/history/academic/recent')
+        
