@@ -17,6 +17,7 @@ def get_LTPA_and_bypass_codes(utorid, password, timeout=10):
     driver = make_driver()
     bypass, *bypass_codes = get_bypass_codes(driver, utorid, password)
     ltpa_token = get_LTPA_token(driver, utorid, password, bypass, timeout)
+    driver.close()
     return (ltpa_token, bypass_codes)
 
 def get_LTPA_token(driver, utorid, password, bypass_code, timeout=10) -> str:
