@@ -4,16 +4,23 @@ import json
 
 from functools import cached_property
 
+class APIResponseError(Exception):
+     response: requests.Response
+     
+     def __init__(self, response, *args, **kwargs):
+         super(*args, **kwargs)
+         self.response = response
+
 ACORN_API_URL = 'https://acorn.utoronto.ca/sws/rest'
 
 class ACORN:
-    def __init__(self, utorid, password):
+    def __init__(self, utorid, password, bypass_codes=None):
         self.utorid = utorid
         self.password = password
         self.session = requests.session()
 
         self.ltpa_token = None
-        self.bypass_codes = []
+        self.bypass_codes = [] if bypass_codes is None else bypass_codes
     
     def authorize(self):
         if self.bypass_codes:
@@ -48,7 +55,11 @@ class ACORN:
     def get_json(self, endpoint, params=None):
         self.authorizeIfNeeded()
         params = {} if params is None else params
-        return json.loads(self.session.get(f'{ACORN_API_URL}{endpoint}', params=params).text)
+        response = self.session.get(f'{ACORN_API_URL}{endpoint}', params=params)
+        try:
+            return json.loads(response.text)
+        except json.JSONDecodeError:
+            return APIResponseError(response)
 
     @cached_property
     def eligible_registrations(self):
@@ -62,7 +73,7 @@ class ACORN:
     def student_no(self):
         return self.program_progress['studentID']
 
-    def course_registration_info(self, course_code, section_code, course_session_code):
+    def course_registration_info(self, course_code, section_code, course_session_code, registration_params=None):
         """
         course_code: department, course number, credit weight, campus
                      e.g MAT102H5, CSC463H1
@@ -70,13 +81,16 @@ class ACORN:
         section_code: F/S
         course_session_code: YYYY(1/5/9) (e.g 20249, 20251)
         """
+        if registration_params is None:
+            registration_params = self.eligible_registrations[0]['registrationParams']
         return self.get_json(
             '/enrolment/course/view',
             # TODO: not too sure about the index 0 here
-            params=self.eligible_registrations[0]['registrationParams'] | {
+            params=registration_params | {
                 'courseCode': course_code,
                 'courseSessionCode': course_session_code,
                 'sectionCode': section_code,
+                'sessionCode': course_session_code,
             }
         )
 
