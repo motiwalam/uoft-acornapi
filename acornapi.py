@@ -73,6 +73,23 @@ class ACORN:
     def student_no(self):
         return self.program_progress['studentID']
 
+    def search_courses(self, course_prefix, student_campus, sessions, registration_params=None):
+        """
+        course_prefix: search term
+        student_campus: ERIN/SCA/STG
+        sessions: list of session codes to search for
+        """
+        if registration_params is None:
+            registration_params = self.eligible_registrations[0]['registrationParams']
+        return self.get_json(
+            '/enrolment/course/matching-courses',
+            params=registration_params | {
+                'coursePrefix': course_prefix,
+                'studentCampus': student_campus,
+                'sessions': sessions,
+            }
+        )
+
     def course_registration_info(self, course_code, section_code, course_session_code, registration_params=None):
         """
         course_code: department, course number, credit weight, campus
@@ -85,7 +102,6 @@ class ACORN:
             registration_params = self.eligible_registrations[0]['registrationParams']
         return self.get_json(
             '/enrolment/course/view',
-            # TODO: not too sure about the index 0 here
             params=registration_params | {
                 'courseCode': course_code,
                 'courseSessionCode': course_session_code,
@@ -96,4 +112,16 @@ class ACORN:
 
     def recent_academic_history(self):
         return self.get_json('/history/academic/recent')
+
+    def timetable(self):
+        return self.get_json('/timetable')
+
+    def exams(self):
+        return self.get_json('/timetable/exams')
+
+    def invoice(self, session_code=""):
+        return self.get_json('/invoice/', params={'sessionCode': session_code})
+
+    def transaction_history(self):
+        return self.get_json('/financial-account/transactionHistory')
         
