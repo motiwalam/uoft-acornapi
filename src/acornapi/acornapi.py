@@ -1,4 +1,4 @@
-import ltpa
+from acornapi import ltpa
 import requests
 import json
 import os
