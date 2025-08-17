@@ -1,7 +1,9 @@
 import ltpa
 import requests
 import json
+import os
 
+from contextlib import contextmanager
 from functools import cached_property
 
 class APIResponseError(Exception):
@@ -12,6 +14,7 @@ class APIResponseError(Exception):
          self.response = response
 
 ACORN_API_URL = 'https://acorn.utoronto.ca/sws/rest'
+DEFAULT_CACHE_PATH = os.path.join(os.getenv('HOME'), '.acorn', 'bypass_codes')
 
 class ACORN:
     def __init__(self, utorid, password, bypass_codes=None):
@@ -125,3 +128,17 @@ class ACORN:
     def transaction_history(self):
         return self.get_json('/financial-account/transactionHistory')
         
+
+@contextmanager
+def ACORN_cached(utorid, password, bypass_codes_path=DEFAULT_CACHE_PATH):
+    bypass_codes = []
+    if os.path.exists(bypass_codes_path):
+       with open(bypass_codes_path, 'r') as file:
+           bypass_codes = [l.strip() for l in file]
+    acorn = ACORN(utorid, password, bypass_codes=bypass_codes)
+    try:
+        yield acorn
+    finally:
+        os.makedirs(os.path.dirname(bypass_codes_path), exist_ok=True)
+        with open(bypass_codes_path, 'w') as file:
+            file.write('\n'.join(acorn.bypass_codes))
