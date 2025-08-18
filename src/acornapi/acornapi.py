@@ -14,15 +14,31 @@ class APIResponseError(Exception):
          self.response = response
 
 ACORN_API_URL = 'https://acorn.utoronto.ca/sws/rest'
-DEFAULT_CACHE_PATH = os.path.join(os.getenv('HOME'), '.acorn', 'bypass_codes')
+
+DEFAULT_CACHE_PATH = os.path.join(os.getenv('HOME'), '.acorn')
 
 class ACORN:
-    def __init__(self, utorid, password, bypass_codes=None):
+    """
+    The ACORN class presents the interface to UofT's ACORN API as different methods on instances of the class.
+
+    The ACORN class uses selenium to login to the ACORN website and obtain cookies. The class handles refreshing
+    the cookies automatically, as needed.
+
+    To enable fully automatic authentication, the class generates bypass codes, which it then uses instead of the
+    Duo push notifications to get pass 2FA. However, if no bypass codes are available, the class will block on a
+    Duo notification to generate more.
+
+    To construct the class, only the "utorid" and "password" parameters are necessary. The ltpa_token and bypass_codes
+    allow users to skip the authentication process if they already have the requisite values. Also see ACORNWithCachedAuth 
+    for maintaining authentication state across object instantiations.
+    """
+    def __init__(self, utorid, password, ltpa_token=None, bypass_codes=None):
         self.utorid = utorid
         self.password = password
         self.session = requests.session()
 
-        self.ltpa_token = None
+        self.ltpa_token = ltpa_token
+        self.__set_session_ltpa()
         self.bypass_codes = [] if bypass_codes is None else bypass_codes
     
     def authorize(self):
@@ -130,15 +146,33 @@ class ACORN:
         
 
 @contextmanager
-def ACORN_cached(utorid, password, bypass_codes_path=DEFAULT_CACHE_PATH):
+def ACORNWithCachedAuth(utorid, password, cache_path=DEFAULT_CACHE_PATH):
+    """
+    ACORNWithCachedAuth provides a contextmanager that wraps construction and destruction
+    of an ACORN object to preserve authentication state in the file system. This makes it
+    possible to avoid unnecessary logins and bypass codes generation.
+
+    cache_path should be a writeable directory; if it does not exist, ACORNWithCachedAuth
+    will make it.
+    """
     bypass_codes = []
-    if os.path.exists(bypass_codes_path):
-       with open(bypass_codes_path, 'r') as file:
+    bc_path = os.path.join(cache_path, "bypass_codes")
+    if os.path.exists(bc_path):
+        with open(bc_path, 'r') as file:
            bypass_codes = [l.strip() for l in file]
-    acorn = ACORN(utorid, password, bypass_codes=bypass_codes)
+    
+    ltpa_token = None
+    ltpa_path = os.path.join(cache_path, "ltpa")
+    if os.path.exists(ltpa_path):
+        with open(ltpa_path, 'r') as file:
+            ltpa_token = file.read().strip()
+
+    acorn = ACORN(utorid, password, ltpa_token=ltpa_token, bypass_codes=bypass_codes)
     try:
         yield acorn
     finally:
-        os.makedirs(os.path.dirname(bypass_codes_path), exist_ok=True)
-        with open(bypass_codes_path, 'w') as file:
+        os.makedirs(cache_path, exist_ok=True)
+        with open(bc_path, 'w') as file:
             file.write('\n'.join(acorn.bypass_codes))
+        with open(ltpa_path, 'w') as file:
+            file.write(acorn.ltpa_token)

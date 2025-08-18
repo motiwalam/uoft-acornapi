@@ -1,7 +1,7 @@
-from .acornapi import ACORN, ACORN_cached, DEFAULT_CACHE_PATH
+from .acornapi import ACORN, ACORNWithCachedAuth, DEFAULT_CACHE_PATH
 
 __all__ = (
     "ACORN",
-    "ACORN_cached",
+    "ACORNWithCachedAuth",
     "DEFAULT_CACHE_PATH"
 )

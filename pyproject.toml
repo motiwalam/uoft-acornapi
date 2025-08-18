@@ -1,6 +1,6 @@
 [project]
 name = "acornapi"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
     "undetected_chromedriver >= 3.5.5",
     "setuptools >= 80.9.0"
